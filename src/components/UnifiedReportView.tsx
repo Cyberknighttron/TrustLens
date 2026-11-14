@@ -1,12 +1,25 @@
-import { CheckCircle2, FileText, Play, Printer, Save } from 'lucide-react';
+import { CheckCircle2, ExternalLink, FileText, Play, Printer, Save } from 'lucide-react';
 import { UNCERTAINTY_DEFINITIONS } from '../data/sampleDataset';
-import { UnifiedTrustLensReport } from '../types/trustlens';
+import { EvidenceRelevance, UnifiedTrustLensReport } from '../types/trustlens';
 import {
   ReversibilityIndicator,
   SensitivityIndicator,
   UncertaintyTag,
   VerdictIndicator,
 } from './UncertaintyTag';
+
+function formatRelevance(relevance: EvidenceRelevance): string {
+  switch (relevance) {
+    case 'Supports':
+      return 'Supporting';
+    case 'Disputes':
+      return 'Contradicting';
+    case 'Partially Relevant':
+      return 'Partially Relevant';
+    case 'Unrelated':
+      return 'Unrelated';
+  }
+}
 
 interface UnifiedReportViewProps {
   report: UnifiedTrustLensReport;
@@ -120,8 +133,10 @@ export function UnifiedReportView({
 
           <p className="mt-4 text-xs leading-relaxed text-slate-400 print-muted">
             Disclaimer: This report reflects transparent, rule-based evaluation inside the TrustLens
-            browser prototype. Sample evidence matches are strictly from built-in DEMO DATA records,
-            and What-If simulations do not guarantee external organizational behavior.
+            prototype. Evidence comes either from Live Evidence Retrieval (public Wikipedia &amp;
+            DuckDuckGo summaries, which provide context and do not independently prove claims) or
+            from built-in DEMO DATA sample records. What-If simulations do not guarantee external
+            organizational behavior.
           </p>
         </section>
 
@@ -146,6 +161,21 @@ export function UnifiedReportView({
 
           {report.claimAnalysis ? (
             <div className="space-y-4 text-xs leading-relaxed">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="font-medium text-slate-400 print-muted">Evidence Source</p>
+                  <p className="mt-0.5 font-semibold text-slate-200 print-heading">
+                    {report.claimAnalysis.sourceMode}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-400 print-muted">Retrieval Status</p>
+                  <p className="mt-0.5 text-slate-300 print-muted">
+                    {report.claimAnalysis.retrievalStatus}
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <p className="font-medium text-slate-400 print-muted">Original Statement / URL</p>
                 <p className="mt-1 text-sm text-slate-200 print-heading">
@@ -190,24 +220,46 @@ export function UnifiedReportView({
 
               <div>
                 <p className="font-medium text-slate-400 print-muted">
-                  Evidence Summary ({report.claimAnalysis.matchedEvidence.length} matched · DEMO DATA)
+                  Evidence Summary ({report.claimAnalysis.matchedEvidence.length}{' '}
+                  {report.claimAnalysis.sourceMode === 'Live Evidence Retrieval'
+                    ? 'retrieved · Live Evidence Retrieval'
+                    : 'matched · DEMO DATA'}
+                  )
                 </p>
                 {report.claimAnalysis.matchedEvidence.length === 0 ? (
                   <p className="mt-1 text-slate-400 print-muted">
-                    No matching entries found in the sample evidence dataset; verdict set to
-                    Inconclusive.
+                    {report.claimAnalysis.sourceMode === 'Live Evidence Retrieval'
+                      ? 'No sufficient public evidence was retrieved for this query; verdict set to Inconclusive.'
+                      : 'No matching entries found in the sample evidence dataset; verdict set to Inconclusive.'}
                   </p>
                 ) : (
                   <ul className="mt-1.5 space-y-2">
                     {report.claimAnalysis.matchedEvidence.map((item) => (
                       <li
                         key={item.evidence.id}
-                        className="rounded-lg border border-slate-800 bg-[#0B1120] p-3 print-card"
+                        className="rounded-lg border border-slate-800 bg-[#0B1120] p-3 print-card space-y-1"
                       >
                         <p className="font-semibold text-slate-200 print-heading">
-                          {item.evidence.id} — {item.evidence.title} ({item.relevance} · DEMO DATA)
+                          {item.evidence.id} — {item.evidence.title} ({formatRelevance(item.relevance)} ·{' '}
+                          {item.evidence.isDemoData ? 'DEMO DATA' : 'LIVE RETRIEVAL'})
                         </p>
-                        <p className="mt-1 text-slate-400 print-muted">{item.evidence.excerpt}</p>
+                        {item.evidence.url && (
+                          <p className="font-mono text-[11px]">
+                            <a
+                              href={item.evidence.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 underline break-all"
+                            >
+                              <span>{item.evidence.url}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            </a>
+                          </p>
+                        )}
+                        <p className="text-slate-400 print-muted">{item.evidence.excerpt}</p>
+                        <p className="text-[11px] text-slate-500 print-muted">
+                          {item.evidence.sourceLabel} · {item.matchReason}
+                        </p>
                       </li>
                     ))}
                   </ul>

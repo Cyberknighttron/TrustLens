@@ -2,7 +2,11 @@ export type UncertaintyLabel = 'CONFIRMED' | 'INFERRED' | 'UNKNOWN';
 
 export type ClaimVerdict = 'Supported' | 'Disputed' | 'Inconclusive';
 
-export type EvidenceRelevance = 'Supports' | 'Disputes' | 'Partially Relevant';
+export type EvidenceRelevance = 'Supports' | 'Disputes' | 'Partially Relevant' | 'Unrelated';
+
+export type EvidenceSourceMode = 'Live Evidence Retrieval' | 'Built-in Demo Dataset';
+
+export type ClaimVerificationMode = 'auto' | 'demo_only';
 
 export type DataCategoryId =
   | 'name'
@@ -26,23 +30,28 @@ export interface SampleEvidenceTopicRule {
   phrases: string[];
 }
 
-export interface SampleEvidenceItem {
+export interface EvidenceRecord {
   id: string;
   title: string;
   sourceLabel: string;
+  excerpt: string;
+  recordedDate: string;
+  isDemoData: boolean;
+  url?: string;
+}
+
+export interface SampleEvidenceItem extends EvidenceRecord {
   domainPattern: string;
   entityKeywords: string[];
   keywords: string[];
   topicRules: SampleEvidenceTopicRule[];
   stance: 'Supports' | 'Disputes';
-  excerpt: string;
   explanation: string;
   isDemoData: true;
-  recordedDate: string;
 }
 
 export interface SubclaimEvidenceMatch {
-  evidence: SampleEvidenceItem;
+  evidence: EvidenceRecord;
   relevance: EvidenceRelevance;
   matchReason: string;
 }
@@ -63,11 +72,13 @@ export interface ClaimAnalysisResult {
   verdict: ClaimVerdict;
   uncertainty: UncertaintyLabel;
   evidenceMatchStatus: UncertaintyLabel;
+  sourceMode: EvidenceSourceMode;
+  retrievalStatus: string;
   explanation: string;
   verificationBoundary: string;
   subclaims: SubclaimEvaluation[];
   matchedEvidence: Array<{
-    evidence: SampleEvidenceItem;
+    evidence: EvidenceRecord;
     relevance: EvidenceRelevance;
     matchReason: string;
   }>;

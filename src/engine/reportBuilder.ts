@@ -24,12 +24,16 @@ export function buildUnifiedReport(params: {
   if (claimAnalysis) {
     if (claimAnalysis.subclaims.length > 0) {
       for (const sc of claimAnalysis.subclaims) {
+        const sourceTag =
+          claimAnalysis.sourceMode === 'Live Evidence Retrieval'
+            ? 'Live Evidence Retrieval'
+            : 'DEMO DATA';
         const statement =
           sc.verdict === 'Disputed'
-            ? `Subclaim ${sc.id} ("${sc.text}") has verdict Disputed (Evidence Match: ${sc.evidenceMatch} against DEMO DATA).`
+            ? `Subclaim ${sc.id} ("${sc.text}") has verdict Disputed (Evidence Match: ${sc.evidenceMatch} via ${sourceTag}).`
             : sc.verdict === 'Supported'
-              ? `Subclaim ${sc.id} ("${sc.text}") has verdict Supported (Evidence Match: ${sc.evidenceMatch} against DEMO DATA).`
-              : `Subclaim ${sc.id} ("${sc.text}") is Inconclusive (Evidence Match: ${sc.evidenceMatch}).`;
+              ? `Subclaim ${sc.id} ("${sc.text}") has verdict Supported (Evidence Match: ${sc.evidenceMatch} via ${sourceTag}).`
+              : `Subclaim ${sc.id} ("${sc.text}") is Inconclusive (Evidence Match: ${sc.evidenceMatch} via ${sourceTag}).`;
 
         const item: ReportFindingItem = {
           category: 'Claim',
@@ -107,7 +111,11 @@ export function buildUnifiedReport(params: {
 
   if (claimAnalysis?.verdict === 'Disputed') {
     recommendations.push(
-      'Pause before submitting personal data: the analyzed claim conflicted with sample evidence entries.'
+      `Pause before trusting or submitting personal data: the analyzed claim conflicted with ${
+        claimAnalysis.sourceMode === 'Live Evidence Retrieval'
+          ? 'retrieved public evidence summaries'
+          : 'DEMO DATA sample evidence entries'
+      }.`
     );
   } else if (!claimAnalysis || claimAnalysis.verdict === 'Inconclusive') {
     recommendations.push(

@@ -275,6 +275,13 @@ export const CLAIM_PRESETS = [
     input:
       'NovaTech Global Fellowship 2027 covers 100% of overseas housing and laboratory stipends for all applicants.',
   },
+  {
+    id: 'preset-live-https',
+    label: 'HTTPS Encryption (Live Retrieval)',
+    badge: 'LIVE RETRIEVAL',
+    input:
+      'HTTPS encrypts communication between a web browser and a website using TLS.',
+  },
 ];
 
 export const PRIVACY_FORM_PRESETS = [

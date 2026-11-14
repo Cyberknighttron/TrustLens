@@ -8,20 +8,21 @@ import { NavSection, Sidebar } from './components/Sidebar';
 import { UnifiedReportView } from './components/UnifiedReportView';
 import { WhatIfView } from './components/WhatIfView';
 import { CLAIM_PRESETS, PRIVACY_FORM_PRESETS, SCHOLARSHIP_DEMO_SCENARIO } from './data/sampleDataset';
-import { analyzeClaimAgainstDemoDataset } from './engine/claimVerifier';
+import { analyzeClaimAgainstDemoDataset, analyzeClaimWithLiveFallback } from './engine/claimVerifier';
 import { analyzePrivacyText } from './engine/privacyAnalyzer';
 import { buildUnifiedReport } from './engine/reportBuilder';
 import { runWhatIfScenarios } from './engine/whatIfEngine';
 import {
   AnalysisHistoryRecord,
   ClaimAnalysisResult,
+  ClaimVerificationMode,
   DataCategoryId,
   PrivacyAnalysisResult,
   SensitivityLevel,
   UnifiedTrustLensReport,
 } from './types/trustlens';
 
-const STORAGE_KEY = 'trustlens_prototype_state_v3';
+const STORAGE_KEY = 'trustlens_prototype_state_v4';
 
 const SECTION_TITLES: Record<NavSection, string> = {
   dashboard: 'Dashboard Overview',
@@ -363,8 +364,8 @@ export default function App() {
     setHistory((prev) => [record, ...prev].slice(0, 12));
   };
 
-  const handleAnalyzeClaim = (input: string) => {
-    const res = analyzeClaimAgainstDemoDataset(input);
+  const handleAnalyzeClaim = async (input: string, mode: ClaimVerificationMode = 'auto') => {
+    const res = await analyzeClaimWithLiveFallback(input, mode);
     setClaimResult(res);
     setArchivedReport(null);
     appendReportToHistory(
@@ -375,7 +376,9 @@ export default function App() {
       undefined,
       res.isDemoMatch
     );
-    setStatusNotice(`Claim evaluated: ${res.verdict} (${res.uncertainty})`);
+    setStatusNotice(
+      `Claim evaluated (${res.sourceMode}): ${res.verdict} · Evidence Match: ${res.evidenceMatchStatus}`
+    );
   };
 
   const handleClearClaim = () => {

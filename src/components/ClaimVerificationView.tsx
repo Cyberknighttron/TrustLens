@@ -3,23 +3,55 @@ import {
   AlertCircle,
   ArrowRight,
   Database,
+  ExternalLink,
   FileCheck2,
   FileText,
+  Globe,
   RotateCcw,
   Search,
 } from 'lucide-react';
 import { CLAIM_PRESETS } from '../data/sampleDataset';
-import { ClaimAnalysisResult } from '../types/trustlens';
+import {
+  ClaimAnalysisResult,
+  ClaimVerificationMode,
+  EvidenceRelevance,
+} from '../types/trustlens';
 import { UncertaintyTag, VerdictIndicator } from './UncertaintyTag';
 
 interface ClaimVerificationViewProps {
   inputValue: string;
   onChangeInput: (val: string) => void;
   result: ClaimAnalysisResult | null;
-  onAnalyzeClaim: (input: string) => Promise<void> | void;
+  onAnalyzeClaim: (input: string, mode: ClaimVerificationMode) => Promise<void> | void;
   onClearClaim: () => void;
   onGoToPrivacy: () => void;
   onGoToReport: () => void;
+}
+
+function getRelevanceBadgeClass(relevance: EvidenceRelevance): string {
+  switch (relevance) {
+    case 'Supports':
+      return 'text-emerald-300';
+    case 'Disputes':
+      return 'text-rose-300';
+    case 'Partially Relevant':
+      return 'text-amber-300';
+    case 'Unrelated':
+      return 'text-slate-400';
+  }
+}
+
+function getRelevanceLabel(relevance: EvidenceRelevance): string {
+  switch (relevance) {
+    case 'Supports':
+      return 'Supporting';
+    case 'Disputes':
+      return 'Contradicting';
+    case 'Partially Relevant':
+      return 'Partially Relevant';
+    case 'Unrelated':
+      return 'Unrelated';
+  }
 }
 
 export function ClaimVerificationView({
@@ -33,6 +65,7 @@ export function ClaimVerificationView({
 }: ClaimVerificationViewProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [verificationMode, setVerificationMode] = useState<ClaimVerificationMode>('auto');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -64,44 +97,77 @@ export function ClaimVerificationView({
 
     setValidationError(null);
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 380));
-    await onAnalyzeClaim(trimmed);
-    setIsLoading(false);
+    try {
+      await onAnalyzeClaim(trimmed, verificationMode);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handlePresetClick = async (presetText: string) => {
+  const handlePresetClick = async (presetText: string, forceMode?: ClaimVerificationMode) => {
+    const modeToUse = forceMode ?? verificationMode;
     setValidationError(null);
     onChangeInput(presetText);
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 320));
-    await onAnalyzeClaim(presetText);
-    setIsLoading(false);
+    try {
+      await onAnalyzeClaim(presetText, modeToUse);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       {/* Header & Input Form */}
       <section className="rounded-xl border border-slate-800 bg-[#111A2E] p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-display text-xl font-bold text-slate-100">
               Claim &amp; URL Verification
             </h1>
             <p className="mt-1 text-xs leading-relaxed text-slate-400">
-              Matches statements or URLs against TrustLens&apos;s built-in{' '}
-              <span className="font-mono text-violet-300">DEMO DATA</span> sample evidence dataset.
+              Queries free public evidence (Wikipedia &amp; DuckDuckGo summaries) with automatic fallback
+              to TrustLens&apos;s <span className="font-mono text-violet-300">DEMO DATA</span> dataset.
               Unmatched claims return <span className="font-medium text-amber-300">Inconclusive</span>.
             </p>
           </div>
-          <span className="font-mono text-xs text-slate-400 shrink-0">
-            Prototype Scope · Local Sample Dataset
-          </span>
+
+          <div
+            role="group"
+            aria-label="Evidence Source Mode"
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/80 p-1 shrink-0 self-start sm:self-auto"
+          >
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setVerificationMode('auto')}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+                verificationMode === 'auto'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Live + Demo Fallback
+            </button>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => setVerificationMode('demo_only')}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+                verificationMode === 'demo_only'
+                  ? 'bg-violet-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Demo Dataset Only
+            </button>
+          </div>
         </div>
 
         {/* Sample Presets */}
         <div className="mt-5">
           <p className="text-xs font-medium text-slate-400 mb-2">
-            Try sample scenarios (DEMO DATA):
+            Try sample scenarios (DEMO DATA &amp; Live Retrieval):
           </p>
           <div className="flex flex-wrap gap-2">
             {CLAIM_PRESETS.map((preset) => (
@@ -109,7 +175,12 @@ export function ClaimVerificationView({
                 key={preset.id}
                 type="button"
                 disabled={isLoading}
-                onClick={() => handlePresetClick(preset.input)}
+                onClick={() =>
+                  handlePresetClick(
+                    preset.input,
+                    preset.badge === 'LIVE RETRIEVAL' ? 'auto' : verificationMode
+                  )
+                }
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-700/90 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-blue-500/50 hover:bg-slate-800 disabled:opacity-60 transition-colors whitespace-nowrap"
               >
                 <span>{preset.label}</span>
@@ -131,11 +202,11 @@ export function ClaimVerificationView({
                 onChangeInput(e.target.value);
                 if (validationError) setValidationError(null);
               }}
-              placeholder="Paste a website URL (e.g. https://demo-meritbridge-scholarship.example/apply) or enter single/multi-part claims to verify..."
+              placeholder="Enter a factual claim to retrieve public evidence (e.g. HTTPS encrypts browser traffic using TLS) or paste a DEMO DATA scenario..."
               className="w-full rounded-lg border border-slate-700 bg-[#0B1120] px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <p className="mt-1.5 text-[11px] text-slate-400">
-              URL inputs are checked against the built-in DEMO DATA sample evidence dataset only. TrustLens does not fetch or inspect live external websites.
+              Live mode retrieves public Wikipedia &amp; DuckDuckGo summaries for claim keywords (it does not crawl arbitrary live web pages). Search snippets provide contextual evidence only and do not independently prove a claim.
             </p>
           </div>
 
@@ -165,7 +236,7 @@ export function ClaimVerificationView({
                 <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
                   {isLoading
-                    ? 'Analyzing...'
+                    ? 'Retrieving & Analyzing...'
                     : result && inputValue.trim() !== result.input
                       ? 'Re-Analyze'
                       : 'Analyze'}
@@ -218,8 +289,8 @@ export function ClaimVerificationView({
             No Claim Analyzed Yet
           </h2>
           <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-400">
-            Enter a claim or URL above, or choose one of the DEMO DATA presets to inspect how TrustLens
-            verifies evidence and applies Uncertainty Labels.
+            Enter a claim or URL above, or choose one of the presets to inspect how TrustLens retrieves
+            public evidence or falls back to the built-in DEMO DATA dataset.
           </p>
         </section>
       )}
@@ -234,7 +305,15 @@ export function ClaimVerificationView({
                 <span aria-hidden="true">·</span>
                 <span>Input Type: {result.inputType.toUpperCase()}</span>
                 <span aria-hidden="true">·</span>
-                <span>{result.isDemoMatch ? 'DEMO DATA MATCH' : 'NO SAMPLE MATCH'}</span>
+                <span
+                  className={
+                    result.sourceMode === 'Live Evidence Retrieval'
+                      ? 'text-blue-300'
+                      : 'text-violet-300'
+                  }
+                >
+                  {result.sourceMode}
+                </span>
               </div>
               <h2 className="font-display text-lg font-semibold text-slate-100">
                 Overall Claim Verification Result
@@ -248,6 +327,25 @@ export function ClaimVerificationView({
           </div>
 
           <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-slate-800/90 bg-[#0B1120] px-3.5 py-2.5">
+                <p className="text-[11px] font-medium text-slate-400">Evidence Source Mode</p>
+                <p
+                  className={`mt-0.5 text-xs font-semibold ${
+                    result.sourceMode === 'Live Evidence Retrieval'
+                      ? 'text-blue-300'
+                      : 'text-violet-300'
+                  }`}
+                >
+                  {result.sourceMode}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-800/90 bg-[#0B1120] px-3.5 py-2.5">
+                <p className="text-[11px] font-medium text-slate-400">Retrieval Status</p>
+                <p className="mt-0.5 text-xs text-slate-200">{result.retrievalStatus}</p>
+              </div>
+            </div>
+
             <div>
               <p className="text-xs font-medium text-slate-400">Original Claim / URL</p>
               <p className="mt-1 rounded-lg border border-slate-800/90 bg-[#0B1120] px-3.5 py-2.5 text-sm text-slate-200">
@@ -299,7 +397,7 @@ export function ClaimVerificationView({
                   {sc.evidenceMatches.length > 0 && (
                     <div className="border-t border-slate-800/80 pt-2.5 space-y-2">
                       <p className="text-[11px] font-medium text-slate-400">
-                        Relevant Sample Evidence for {sc.id}:
+                        Evaluated Evidence for {sc.id}:
                       </p>
                       {sc.evidenceMatches.map((match) => (
                         <div
@@ -311,15 +409,12 @@ export function ClaimVerificationView({
                               {match.evidence.id} — {match.evidence.title}
                             </span>
                             <span
-                              className={`font-mono text-[11px] font-medium ${
-                                match.relevance === 'Supports'
-                                  ? 'text-emerald-300'
-                                  : match.relevance === 'Disputes'
-                                    ? 'text-rose-300'
-                                    : 'text-amber-300'
-                              }`}
+                              className={`font-mono text-[11px] font-medium ${getRelevanceBadgeClass(
+                                match.relevance
+                              )}`}
                             >
-                              {match.relevance} · DEMO DATA
+                              {getRelevanceLabel(match.relevance)} ·{' '}
+                              {match.evidence.isDemoData ? 'DEMO DATA' : 'LIVE RETRIEVAL'}
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-400">{match.matchReason}</p>
@@ -334,24 +429,50 @@ export function ClaimVerificationView({
 
           {/* Evidence Section */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-violet-400" aria-hidden="true" />
+                {result.sourceMode === 'Live Evidence Retrieval' ? (
+                  <Globe className="h-4 w-4 text-blue-400" aria-hidden="true" />
+                ) : (
+                  <Database className="h-4 w-4 text-violet-400" aria-hidden="true" />
+                )}
                 <h3 className="font-display text-sm font-semibold text-slate-100">
-                  Sample Evidence Records
+                  {result.sourceMode === 'Live Evidence Retrieval'
+                    ? 'Retrieved Public Evidence Records'
+                    : 'Sample Evidence Records'}
                 </h3>
               </div>
-              <span className="font-mono text-xs text-violet-300 tabular-nums">
-                {result.matchedEvidence.length} matched · DEMO DATA
+              <span
+                className={`font-mono text-xs tabular-nums ${
+                  result.sourceMode === 'Live Evidence Retrieval'
+                    ? 'text-blue-300'
+                    : 'text-violet-300'
+                }`}
+              >
+                {result.matchedEvidence.length}{' '}
+                {result.sourceMode === 'Live Evidence Retrieval' ? 'retrieved · LIVE' : 'matched · DEMO DATA'}
               </span>
             </div>
 
             {result.matchedEvidence.length === 0 ? (
               <div className="rounded-lg border border-slate-800 bg-[#0B1120] p-4 text-xs text-slate-400">
-                No entries in the sample evidence dataset matched this query. Under TrustLens rules,
-                unmatched claims always return <span className="text-amber-300 font-medium">Inconclusive</span>{' '}
-                with <span className="font-mono text-amber-300">Evidence Match: UNKNOWN</span> rather
-                than fabricating external citations.
+                {result.sourceMode === 'Live Evidence Retrieval' ? (
+                  <>
+                    Live public retrieval returned no sufficient sources for this query. Under
+                    TrustLens rules, unavailable evidence always returns{' '}
+                    <span className="text-amber-300 font-medium">Inconclusive</span> with{' '}
+                    <span className="font-mono text-amber-300">Evidence Match: UNKNOWN</span> rather
+                    than fabricating citations.
+                  </>
+                ) : (
+                  <>
+                    No entries in the sample evidence dataset matched this query. Under TrustLens
+                    rules, unmatched claims always return{' '}
+                    <span className="text-amber-300 font-medium">Inconclusive</span> with{' '}
+                    <span className="font-mono text-amber-300">Evidence Match: UNKNOWN</span> rather
+                    than fabricating external citations.
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -365,15 +486,12 @@ export function ClaimVerificationView({
                         {item.evidence.title}
                       </span>
                       <span
-                        className={`font-mono text-xs font-medium ${
-                          item.relevance === 'Supports'
-                            ? 'text-emerald-300'
-                            : item.relevance === 'Disputes'
-                              ? 'text-rose-300'
-                              : 'text-amber-300'
-                        }`}
+                        className={`font-mono text-xs font-medium ${getRelevanceBadgeClass(
+                          item.relevance
+                        )}`}
                       >
-                        {item.relevance} · DEMO DATA
+                        {getRelevanceLabel(item.relevance)} ·{' '}
+                        {item.evidence.isDemoData ? 'DEMO DATA' : 'LIVE RETRIEVAL'}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-mono">
@@ -381,9 +499,25 @@ export function ClaimVerificationView({
                       <span aria-hidden="true">·</span>
                       <span>{item.evidence.sourceLabel}</span>
                       <span aria-hidden="true">·</span>
-                      <span>Recorded {item.evidence.recordedDate}</span>
+                      <span>
+                        {item.evidence.isDemoData ? 'Recorded' : 'Retrieved'} {item.evidence.recordedDate}
+                      </span>
                     </div>
+                    {item.evidence.url && (
+                      <div className="text-xs">
+                        <a
+                          href={item.evidence.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 font-mono text-blue-400 hover:text-blue-300 underline break-all"
+                        >
+                          <span>{item.evidence.url}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        </a>
+                      </div>
+                    )}
                     <p className="text-xs leading-relaxed text-slate-300">{item.evidence.excerpt}</p>
+                    <p className="text-[11px] text-slate-400">{item.matchReason}</p>
                   </div>
                 ))}
               </div>
@@ -414,3 +548,4 @@ export function ClaimVerificationView({
     </div>
   );
 }
+
